@@ -112,7 +112,9 @@ func (t *Tick) BestAsk() float64 {
 	// best ask is the lowest
 	for _, ask := range t.Asks {
 		val := ask.PriceAsFloat()
-		if val < best {
+		if 0 == best {
+			best = val
+		} else if val < best {
 			best = val
 		}
 	}
