@@ -11,9 +11,7 @@ import (
 	"time"
 )
 
-const (
-	baseUrl = "https://stream-fxtrade.oanda.com/v3/accounts/%s/pricing/stream?instruments=%s"
-)
+var baseUrl string
 
 // {
 // 	"time": "2016-12-20T05:55:46.064294036Z",
@@ -141,7 +139,7 @@ func (t *Tick) BestBid() float64 {
 }
 
 type Quote struct {
-	Liquidity int64  `json:"liquidity"`
+	Liquidity float64  `json:"liquidity"`
 	Price     string `json:"price"`
 }
 
@@ -160,7 +158,12 @@ type Client struct {
 	currencies string
 }
 
-func New(account, token, currencies string) *Client {
+func New(account, token, currencies string, live bool) *Client {
+	if live {
+		baseUrl = "https://stream-fxtrade.oanda.com/v3/accounts/%s/pricing/stream?instruments=%s"
+	} else {
+		baseUrl = "https://stream-fxpractice.oanda.com/v3/accounts/%s/pricing/stream?instruments=%s"
+	}
 	return &Client{
 		account:    account,
 		token:      token,
