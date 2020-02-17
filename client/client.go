@@ -3,8 +3,8 @@ package client
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -77,39 +77,52 @@ func (t *Tick) Symbol() string {
 	return strings.Replace(t.Instrument, "_", "", 1)
 }
 
-func (t *Tick) parseTime() time.Time {
+func (t *Tick) parseTime() (time.Time, error) {
 	if !t.parsedTime.IsZero() {
-		return t.parsedTime
+		return t.parsedTime, nil
 	}
 
 	parsedTime, err := time.Parse(time.RFC3339Nano, t.Time)
 	if err != nil {
-		log.Fatalln(err)
+		return parsedTime, err
 	}
 
 	t.parsedTime = parsedTime
 
-	return t.parsedTime
+	return t.parsedTime, nil
 }
 
-func (t *Tick) UnixTimestamp() int64 {
-	return t.parseTime().Unix()
+func (t *Tick) UnixTimestamp() (int64, error) {
+	parsedTime, err := t.parseTime()
+	if err != nil {
+		return int64(0), err
+	}
+
+	return parsedTime.Unix(), nil
 }
 
-func (t *Tick) Nanoseconds() int64 {
-	return int64(t.parseTime().Nanosecond())
+func (t *Tick) Nanoseconds() (int64, error) {
+	parsedTime, err := t.parseTime()
+	if err != nil {
+		return int64(0), err
+	}
+
+	return int64(parsedTime.Nanosecond()), nil
 }
 
-func (t *Tick) BestAsk() float64 {
+func (t *Tick) BestAsk() (float64, error) {
 	if 0 == len(t.Asks) {
-		return 0.0
+		return 0.0, nil
 	}
 
 	var best float64
 
 	// best ask is the lowest
 	for _, ask := range t.Asks {
-		val := ask.PriceAsFloat()
+		val, err := ask.PriceAsFloat()
+		if err != nil {
+			return 0.0, err
+		}
 		if 0 == best {
 			best = val
 		} else if val < best {
@@ -117,25 +130,28 @@ func (t *Tick) BestAsk() float64 {
 		}
 	}
 
-	return best
+	return best, nil
 }
 
-func (t *Tick) BestBid() float64 {
+func (t *Tick) BestBid() (float64, error) {
 	if 0 == len(t.Bids) {
-		return 0.0
+		return 0.0, nil
 	}
 
 	var best float64
 
 	// best bid is the highest
 	for _, bid := range t.Bids {
-		val := bid.PriceAsFloat()
+		val, err := bid.PriceAsFloat()
+		if err != nil {
+			return 0.0, err
+		}
 		if val > best {
 			best = val
 		}
 	}
 
-	return best
+	return best, nil
 }
 
 type Quote struct {
@@ -143,13 +159,13 @@ type Quote struct {
 	Price     string `json:"price"`
 }
 
-func (q *Quote) PriceAsFloat() float64 {
+func (q *Quote) PriceAsFloat() (float64, error) {
 	val, err := strconv.ParseFloat(q.Price, 64)
 	if err != nil {
-		log.Fatalln(err)
+		return float64(0), err
 	}
 
-	return val
+	return val, nil
 }
 
 type Client struct {
@@ -175,11 +191,10 @@ func (c *Client) url() string {
 	return fmt.Sprintf(baseUrl, c.account, c.currencies)
 }
 
-func (c *Client) Run(f func(*Tick)) {
+func (c *Client) Run(f func(*Tick)) error {
 	req, err := http.NewRequest("GET", c.url(), nil)
 	if err != nil {
-		log.Fatalln("http.NewRequest:", err)
-		return
+		return errors.New(fmt.Sprint("http.NewRequest:", err))
 	}
 
 	// set our bearer token
@@ -188,8 +203,7 @@ func (c *Client) Run(f func(*Tick)) {
 	// just use the DefaultClient, no need to be fancy here
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Fatalln("http.Get:", err)
-		return
+		return errors.New(fmt.Sprint("http.Get:", err))
 	}
 
 	tick := &Tick{}
@@ -199,13 +213,11 @@ func (c *Client) Run(f func(*Tick)) {
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			// technically, we should never get io.EOF here
-			log.Fatalln("reader.ReadBytes:", err)
-			return
+			return errors.New(fmt.Sprint("reader.ReadBytes:", err))
 		}
 
 		if err := json.Unmarshal(line, tick); err != nil {
-			log.Fatalln("json.Unmarshal:", err)
-			return
+			return errors.New(fmt.Sprint("json.Unmarshal:", err))
 		}
 
 		// skip a few kinds of ticks here:
