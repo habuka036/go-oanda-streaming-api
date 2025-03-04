@@ -61,6 +61,51 @@ type Tick struct {
 	parsedTime time.Time
 }
 
+type Transaction struct {
+	Id                          string    `json:"id"`
+	Time                        time.Time `json:"time"`
+	UserId                      int       `json:"userID"`
+	AccountID                   string    `json:"accountID"`
+	BatchId                     string    `json:"batchID"`
+	RequestId                   string    `json:"requestID"`
+	Type                        string    `json:"type"`
+	OrderId                     string    `json:"orderID"`
+	ClientOrderId               string    `json:"clientOrderID"`
+	Instrument                  string    `json:"instrument"`
+	Units                       string    `json:"units"`
+	HomeConversionFactors       string    `json:"homeConversionFactors"`
+	Price                       string    `json:"price"`
+	FullVWAP                    string    `json:"fullVWAP"`
+	FullPrice                   string    `json:"fullPrice"`
+	Reason                      string    `json:"reason"`
+	Pl                          string    `json:"pl"`
+	QuotePl                     string    `json:"quotePL"`
+	Financing                   string    `json:"financing"`
+	BaseFinancing               string    `json:"baseFinancing"`
+	QuoteFinancing              string    `json:"quoteFinancing"`
+	Commission                  string    `json:"commission"`
+	GuaranteedExecutionFee      string    `json:"guaranteedExecutionFee"`
+	QuoteGuaranteedExecutionFee string    `json:"quoteGuaranteedExecutionFee"`
+	AccountBalance              string    `json:"accountBalance"`
+	TradeOpened                 string    `json:"tradeOpened"`
+	TradeClosed                 string    `json:"tradeClosed"`
+	TradeReduced                string    `json:"tradeReduced"`
+	HalfSpreadCost              string    `json:"halfSpreadCost"`
+}
+
+func (t *Transaction) IsOrderFill() bool {
+	return "ORDER_FILL" == t.Type
+}
+
+func (t *Transaction) IsMarketOrderTradeClose() bool {
+	return "MARKET_ORDER_TRADE_CLOSE" == t.Reason
+
+}
+
+func (t *Transaction) IsTakeProfitOrder() bool {
+	return "TAKE_PROFIT_ORDER" == t.Reason
+}
+
 func (t *Tick) IsJapanese() bool {
 	return strings.Contains(t.Instrument, "JPY")
 }
@@ -155,8 +200,8 @@ func (t *Tick) BestBid() (float64, error) {
 }
 
 type Quote struct {
-	Liquidity float64  `json:"liquidity"`
-	Price     string `json:"price"`
+	Liquidity float64 `json:"liquidity"`
+	Price     string  `json:"price"`
 }
 
 func (q *Quote) PriceAsFloat() (float64, error) {
@@ -169,9 +214,10 @@ func (q *Quote) PriceAsFloat() (float64, error) {
 }
 
 type Client struct {
-	account    string
-	token      string
-	currencies string
+	account     string
+	token       string
+	currencies  string
+	client_type string
 }
 
 func New(account, token, currencies string, live bool) *Client {
@@ -181,9 +227,24 @@ func New(account, token, currencies string, live bool) *Client {
 		baseUrl = "https://stream-fxpractice.oanda.com/v3/accounts/%s/pricing/stream?instruments=%s"
 	}
 	return &Client{
-		account:    account,
-		token:      token,
-		currencies: currencies,
+		account:     account,
+		token:       token,
+		currencies:  currencies,
+		client_type: "PRICE",
+	}
+}
+
+func NewTransaction(account, token string, live bool) *Client {
+	if live {
+		baseUrl = "https://api-fxtrade.oanda.com/v3/accounts/%s/transactions/stream"
+	} else {
+		baseUrl = "https://api-fxpractice.oanda.com/v3/accounts/%s/transactions/stream"
+	}
+	return &Client{
+		account:     account,
+		token:       token,
+		currencies:  "",
+		client_type: "TRANSACTION",
 	}
 }
 
@@ -225,6 +286,41 @@ func (c *Client) Run(f func(*Tick)) error {
 		//   - the "last prices" sent when initially connecting to the API
 		if tick.IsTradeable() {
 			f(tick)
+		}
+	}
+}
+
+func (c *Client) RunTransactions(f func(*Transaction)) error {
+	req, err := http.NewRequest("GET", c.url(), nil)
+	if err != nil {
+		return errors.New(fmt.Sprint("http.NewRequest:", err))
+	}
+
+	// set our bearer token
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	// just use the DefaultClient, no need to be fancy here
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return errors.New(fmt.Sprint("http.Get:", err))
+	}
+
+	transaction := &Transaction{}
+
+	reader := bufio.NewReader(resp.Body)
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err != nil {
+			// technically, we should never get io.EOF here
+			return errors.New(fmt.Sprint("reader.ReadBytes:", err))
+		}
+
+		if err := json.Unmarshal(line, transaction); err != nil {
+			return errors.New(fmt.Sprint("json.Unmarshal:", err))
+		}
+
+		if transaction.IsOrderFill() && (transaction.IsMarketOrderTradeClose() || transaction.IsTakeProfitOrder()) {
+			f(transaction)
 		}
 	}
 }
