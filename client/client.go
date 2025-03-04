@@ -62,35 +62,35 @@ type Tick struct {
 }
 
 type Transaction struct {
-	Id                          string    `json:"id"`
-	Time                        time.Time `json:"time"`
-	UserId                      int       `json:"userID"`
-	AccountID                   string    `json:"accountID"`
-	BatchId                     string    `json:"batchID"`
-	RequestId                   string    `json:"requestID"`
-	Type                        string    `json:"type"`
-	OrderId                     string    `json:"orderID"`
-	ClientOrderId               string    `json:"clientOrderID"`
-	Instrument                  string    `json:"instrument"`
-	Units                       string    `json:"units"`
-	HomeConversionFactors       string    `json:"homeConversionFactors"`
-	Price                       string    `json:"price"`
-	FullVWAP                    string    `json:"fullVWAP"`
-	FullPrice                   string    `json:"fullPrice"`
-	Reason                      string    `json:"reason"`
-	Pl                          string    `json:"pl"`
-	QuotePl                     string    `json:"quotePL"`
-	Financing                   string    `json:"financing"`
-	BaseFinancing               string    `json:"baseFinancing"`
-	QuoteFinancing              string    `json:"quoteFinancing"`
-	Commission                  string    `json:"commission"`
-	GuaranteedExecutionFee      string    `json:"guaranteedExecutionFee"`
-	QuoteGuaranteedExecutionFee string    `json:"quoteGuaranteedExecutionFee"`
-	AccountBalance              string    `json:"accountBalance"`
-	TradeOpened                 string    `json:"tradeOpened"`
-	TradeClosed                 string    `json:"tradeClosed"`
-	TradeReduced                string    `json:"tradeReduced"`
-	HalfSpreadCost              string    `json:"halfSpreadCost"`
+	Id string `json:"id"`
+	Time time.Time `json:"time"`
+	UserId int `json:"userID"`
+	AccountID string `json:"accountID"`
+	BatchId string `json:"batchID"`
+	RequestId string `json:"requestID"`
+	Type string `json:"type"`
+	OrderId string `json:"orderID"`
+	ClientOrderId string `json:"clientOrderID"`
+	Instrument string `json:"instrument"`
+	Units string `json:"units"`
+	HomeConversionFactors string `json:"homeConversionFactors"`
+	Price string `json:"price"`
+	FullVWAP string `json:"fullVWAP"`
+	FullPrice string `json:"fullPrice"`
+	Reason string `json:"reason"`
+	Pl string `json:"pl"`
+	QuotePl string `json:"quotePL"`
+	Financing string `json:"financing"`
+	BaseFinancing string `json:"baseFinancing"`
+	QuoteFinancing string `json:"quoteFinancing"`
+	Commission string `json:"commission"`
+	GuaranteedExecutionFee string `json:"guaranteedExecutionFee"`
+	QuoteGuaranteedExecutionFee string `json:"quoteGuaranteedExecutionFee"`
+	AccountBalance string `json:"accountBalance"`
+	TradeOpened string `json:"tradeOpened"`
+	TradeClosed string `json:"tradeClosed"`
+	TradeReduced string `json:"tradeReduced"`
+	HalfSpreadCost string `json:"halfSpreadCost"`
 }
 
 func (t *Transaction) IsOrderFill() bool {
@@ -200,8 +200,8 @@ func (t *Tick) BestBid() (float64, error) {
 }
 
 type Quote struct {
-	Liquidity float64 `json:"liquidity"`
-	Price     string  `json:"price"`
+	Liquidity float64  `json:"liquidity"`
+	Price     string `json:"price"`
 }
 
 func (q *Quote) PriceAsFloat() (float64, error) {
@@ -214,10 +214,10 @@ func (q *Quote) PriceAsFloat() (float64, error) {
 }
 
 type Client struct {
-	account     string
-	token       string
-	currencies  string
-	client_type string
+	account    string
+	token      string
+	currencies string
+	client_type      string
 }
 
 func New(account, token, currencies string, live bool) *Client {
@@ -227,10 +227,10 @@ func New(account, token, currencies string, live bool) *Client {
 		baseUrl = "https://stream-fxpractice.oanda.com/v3/accounts/%s/pricing/stream?instruments=%s"
 	}
 	return &Client{
-		account:     account,
-		token:       token,
-		currencies:  currencies,
-		client_type: "PRICE",
+		account:    account,
+		token:      token,
+		currencies: currencies,
+		client_type:	   "PRICE",
 	}
 }
 
@@ -241,16 +241,18 @@ func NewTransaction(account, token string, live bool) *Client {
 		baseUrl = "https://api-fxpractice.oanda.com/v3/accounts/%s/transactions/stream"
 	}
 	return &Client{
-		account:     account,
-		token:       token,
-		currencies:  "",
-		client_type: "TRANSACTION",
+		account:    account,
+		token:      token,
+		currencies: "",
+		client_type:	   "TRANSACTION",
 	}
 }
 
 func (c *Client) url() string {
 	return fmt.Sprintf(baseUrl, c.account, c.currencies)
 }
+
+
 
 func (c *Client) Run(f func(*Tick)) error {
 	req, err := http.NewRequest("GET", c.url(), nil)
@@ -291,7 +293,8 @@ func (c *Client) Run(f func(*Tick)) error {
 }
 
 func (c *Client) RunTransactions(f func(*Transaction)) error {
-	req, err := http.NewRequest("GET", c.url(), nil)
+	url := fmt.Sprintf(baseUrl, c.account)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return errors.New(fmt.Sprint("http.NewRequest:", err))
 	}
