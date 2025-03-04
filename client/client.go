@@ -296,7 +296,7 @@ func (c *Client) RunTransactions(f func(*Transaction)) error {
 	url := fmt.Sprintf(baseUrl, c.account)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return errors.New(fmt.Sprint("http.NewRequest:", err))
+		return errors.New(fmt.Sprintf("http.NewRequest: url: %s, error: %v", url, err))
 	}
 
 	// set our bearer token
